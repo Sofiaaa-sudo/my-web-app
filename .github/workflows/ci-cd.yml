@@ -1,0 +1,69 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Verify required files
+        run: |
+          test -f index.html && echo "index.html OK" || exit 1
+          test -f app.js && echo "app.js OK" || exit 1
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Basic tests
+        run: |
+          grep -q "<html>" index.html
+          grep -q "function" app.js
+          echo "All tests passed!"
+
+  package:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Create build folder
+        run: |
+          mkdir build
+          cp index.html build/
+          cp style.css build/ 2>/dev/null || true
+          cp app.js build/
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-app
+          path: build/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: package
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
